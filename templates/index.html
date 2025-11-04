@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Bitcoin ECDSA Analyzer{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>Bitcoin ECDSA Vulnerability Analyzer</h1>
+    <p class="subtitle">Analyze Bitcoin transactions for weak ECDSA signatures and potential private key recovery</p>
+</div>
+
+<div class="features-grid">
+    <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <h3>Transaction Analysis</h3>
+        <p>Analyze Bitcoin transactions for weak signatures, nonce reuse, and other ECDSA vulnerabilities</p>
+        <a href="/transaction" class="btn btn-primary">Analyze Transaction</a>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon">📍</div>
+        <h3>Address Analysis</h3>
+        <p>Examine Bitcoin addresses for transaction history and signature patterns</p>
+        <a href="/address" class="btn btn-primary">Analyze Address</a>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon">🔐</div>
+        <h3>ECDSA Calculator</h3>
+        <p>Perform ECDSA calculations and private key recovery from signature parameters</p>
+        <a href="/ecdsa-analysis" class="btn btn-primary">ECDSA Analysis</a>
+    </div>
+
+    <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Block Scanner</h3>
+        <p>Scan Bitcoin blocks for vulnerable transactions and weak signatures</p>
+        <button class="btn btn-primary" onclick="scanLatestBlock()">Scan Latest Block</button>
+    </div>
+</div>
+
+<div class="info-section">
+    <h2>About This Tool</h2>
+    <p>This tool analyzes Bitcoin transactions for ECDSA signature vulnerabilities, including:</p>
+    <ul>
+        <li><strong>Nonce Reuse:</strong> Detects when the same nonce (k) is used in multiple signatures</li>
+        <li><strong>Weak Signatures:</strong> Identifies signatures with low r or s values</li>
+        <li><strong>Private Key Recovery:</strong> Attempts to recover private keys from vulnerable signatures</li>
+        <li><strong>Address Monitoring:</strong> Tracks signature patterns across multiple transactions</li>
+    </ul>
+    <div class="warning-box">
+        <strong>⚠️ Educational Purpose Only</strong>
+        <p>This tool is for educational and research purposes. Always respect privacy and legal boundaries.</p>
+    </div>
+</div>
+
+<div id="scan-results" class="results-container" style="display: none;">
+    <h3>Scan Results</h3>
+    <div id="scan-output"></div>
+</div>
+
+<script>
+async function scanLatestBlock() {
+    const resultsDiv = document.getElementById('scan-results');
+    const outputDiv = document.getElementById('scan-output');
+    
+    resultsDiv.style.display = 'block';
+    outputDiv.innerHTML = '<div class="loading">Scanning latest block...</div>';
+    
+    try {
+        const response = await fetch('/api/auto-scan');
+        const data = await response.json();
+        
+        if (data.success) {
+            outputDiv.innerHTML = `
+                <div class="success-message">
+                    <p><strong>Block Hash:</strong> ${data.block_hash}</p>
+                    <p><strong>Transactions Scanned:</strong> ${data.scanned_transactions}</p>
+                    <p><strong>Weak Signatures Found:</strong> ${data.weak_signatures_found}</p>
+                    ${data.results.length > 0 ? `
+                        <div class="vulnerable-txs">
+                            <h4>Vulnerable Transactions:</h4>
+                            ${data.results.map(tx => `
+                                <div class="tx-result">
+                                    <p><strong>TX ID:</strong> ${tx.tx_id}</p>
+                                    <p><strong>Private Keys Found:</strong> ${tx.private_keys_found}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<p>No vulnerable transactions found.</p>'}
+                </div>
+            `;
+        } else {
+            outputDiv.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
+        }
+    } catch (error) {
+        outputDiv.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+    }
+}
+</script>
+{% endblock %}

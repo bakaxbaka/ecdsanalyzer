@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}ECDSA Analysis - Bitcoin ECDSA Analyzer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>ECDSA Analysis & Private Key Recovery</h1>
+    <p>Perform ECDSA calculations and recover private keys from signature parameters</p>
+</div>
+
+<div class="analysis-form">
+    <div class="tabs">
+        <button class="tab-button active" onclick="switchTab('auto')">Auto Extract from TX</button>
+        <button class="tab-button" onclick="switchTab('manual')">Manual Parameters</button>
+    </div>
+
+    <div id="auto-tab" class="tab-content active">
+        <form id="auto-form">
+            <div class="form-group">
+                <label for="auto_tx_id">Transaction ID</label>
+                <input type="text" id="auto_tx_id" name="tx_id" class="form-control" 
+                       placeholder="Enter transaction ID with nonce reuse" required>
+                <small class="form-text">The tool will automatically extract signature parameters</small>
+            </div>
+            <button type="submit" class="btn btn-primary">Extract & Analyze</button>
+        </form>
+    </div>
+
+    <div id="manual-tab" class="tab-content">
+        <form id="manual-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="r1">R1 (hex)</label>
+                    <input type="text" id="r1" name="r1" class="form-control" placeholder="R value from signature 1">
+                </div>
+                <div class="form-group">
+                    <label for="s1">S1 (hex)</label>
+                    <input type="text" id="s1" name="s1" class="form-control" placeholder="S value from signature 1">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="m1">M1 / Z1 (hex)</label>
+                    <input type="text" id="m1" name="m1" class="form-control" placeholder="Message hash 1">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="r2">R2 (hex)</label>
+                    <input type="text" id="r2" name="r2" class="form-control" placeholder="R value from signature 2">
+                </div>
+                <div class="form-group">
+                    <label for="s2">S2 (hex)</label>
+                    <input type="text" id="s2" name="s2" class="form-control" placeholder="S value from signature 2">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="m2">M2 / Z2 (hex)</label>
+                    <input type="text" id="m2" name="m2" class="form-control" placeholder="Message hash 2">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Calculate Private Key</button>
+        </form>
+    </div>
+</div>
+
+<div id="results" class="results-container" style="display: none;">
+    <h2>Analysis Results</h2>
+    <div id="results-content"></div>
+</div>
+
+<script>
+function switchTab(tab) {
+    const autoTab = document.getElementById('auto-tab');
+    const manualTab = document.getElementById('manual-tab');
+    const buttons = document.querySelectorAll('.tab-button');
+    
+    if (tab === 'auto') {
+        autoTab.classList.add('active');
+        manualTab.classList.remove('active');
+        buttons[0].classList.add('active');
+        buttons[1].classList.remove('active');
+    } else {
+        autoTab.classList.remove('active');
+        manualTab.classList.add('active');
+        buttons[0].classList.remove('active');
+        buttons[1].classList.add('active');
+    }
+}
+
+document.getElementById('auto-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const txId = document.getElementById('auto_tx_id').value.trim();
+    await analyzeECDSA({ tx_id: txId });
+});
+
+document.getElementById('manual-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const params = {
+        r1: document.getElementById('r1').value.trim(),
+        s1: document.getElementById('s1').value.trim(),
+        m1: document.getElementById('m1').value.trim(),
+        r2: document.getElementById('r2').value.trim(),
+        s2: document.getElementById('s2').value.trim(),
+        m2: document.getElementById('m2').value.trim()
+    };
+    
+    await analyzeECDSA(params);
+});
+
+async function analyzeECDSA(params) {
+    const resultsDiv = document.getElementById('results');
+    const resultsContent = document.getElementById('results-content');
+    
+    resultsDiv.style.display = 'block';
+    resultsContent.innerHTML = '<div class="loading">Performing ECDSA analysis...</div>';
+    
+    try {
+        const response = await fetch('/api/analyze/ecdsa', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(params)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            displayResults(data);
+        } else {
+            resultsContent.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
+        }
+    } catch (error) {
+        resultsContent.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+    }
+}
+
+function displayResults(data) {
+    const resultsContent = document.getElementById('results-content');
+    
+    let html = `
+        <div class="result-summary success-message">
+            <h3>🔓 Private Key Recovered Successfully!</h3>
+            <div class="key-details">
+                <div class="key-item">
+                    <strong>Nonce (k):</strong>
+                    <code class="key-value">${data.k}</code>
+                </div>
+                <div class="key-item">
+                    <strong>Private Key (x):</strong>
+                    <code class="key-value">${data.x}</code>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (data.extracted_params) {
+        html += `
+            <div class="extracted-params">
+                <h4>Extracted Parameters</h4>
+                <div class="params-grid">
+                    <div class="param-item">
+                        <strong>R1:</strong> <code>${data.extracted_params.r1}</code>
+                    </div>
+                    <div class="param-item">
+                        <strong>S1:</strong> <code>${data.extracted_params.s1}</code>
+                    </div>
+                    <div class="param-item">
+                        <strong>M1:</strong> <code>${data.extracted_params.m1}</code>
+                    </div>
+                    <div class="param-item">
+                        <strong>R2:</strong> <code>${data.extracted_params.r2}</code>
+                    </div>
+                    <div class="param-item">
+                        <strong>S2:</strong> <code>${data.extracted_params.s2}</code>
+                    </div>
+                    <div class="param-item">
+                        <strong>M2:</strong> <code>${data.extracted_params.m2}</code>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    if (data.tx_id) {
+        html += `<p class="info-message"><strong>Source Transaction:</strong> ${data.tx_id}</p>`;
+    }
+    
+    resultsContent.innerHTML = html;
+}
+</script>
+{% endblock %}

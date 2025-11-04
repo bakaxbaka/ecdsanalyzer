@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Standalone Calculator - Bitcoin ECDSA Analyzer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Standalone ECDSA Calculator</h1>
+    <p>Offline Bitcoin ECDSA calculator for educational purposes</p>
+</div>
+
+<div class="calculator-info">
+    <p>This is an offline-capable ECDSA calculator that can be downloaded and used without an internet connection.</p>
+    <a href="/download-calculator" class="btn btn-primary" download>Download Standalone Calculator</a>
+</div>
+
+<div class="calculator-embed">
+    <iframe src="/static/ecdsa_standalone.html" style="width: 100%; height: 800px; border: 1px solid #ddd; border-radius: 8px;"></iframe>
+</div>
+
+<div class="info-section">
+    <h3>Features</h3>
+    <ul>
+        <li>Works completely offline</li>
+        <li>No data sent to any server</li>
+        <li>Calculate private keys from ECDSA signature pairs</li>
+        <li>Verify Bitcoin addresses</li>
+        <li>Educational tool for understanding ECDSA vulnerabilities</li>
+    </ul>
+</div>
+{% endblock %}

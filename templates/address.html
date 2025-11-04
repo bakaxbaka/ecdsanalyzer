@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Address Analysis - Bitcoin ECDSA Analyzer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Address Analysis</h1>
+    <p>Analyze Bitcoin addresses for transaction history and signature patterns</p>
+</div>
+
+<div class="analysis-form">
+    <form id="address-form">
+        <div class="form-group">
+            <label for="address">Bitcoin Address</label>
+            <input type="text" id="address" name="address" class="form-control" 
+                   placeholder="Enter Bitcoin address" required>
+            <small class="form-text">Example: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa</small>
+        </div>
+        <button type="submit" class="btn btn-primary">Analyze Address</button>
+    </form>
+</div>
+
+<div id="results" class="results-container" style="display: none;">
+    <h2>Analysis Results</h2>
+    <div id="results-content"></div>
+</div>
+
+<script>
+document.getElementById('address-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const address = document.getElementById('address').value.trim();
+    const resultsDiv = document.getElementById('results');
+    const resultsContent = document.getElementById('results-content');
+    
+    resultsDiv.style.display = 'block';
+    resultsContent.innerHTML = '<div class="loading">Analyzing address...</div>';
+    
+    try {
+        const response = await fetch('/api/analyze/address', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ address: address })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayResults(data);
+        } else {
+            resultsContent.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
+        }
+    } catch (error) {
+        resultsContent.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+    }
+});
+
+function displayResults(data) {
+    const resultsContent = document.getElementById('results-content');
+    
+    if (data.error) {
+        resultsContent.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
+        return;
+    }
+    
+    let html = `
+        <div class="result-summary">
+            <h3>Address: ${data.address}</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">${data.total_received || 0}</div>
+                    <div class="stat-label">Total Received (BTC)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${data.total_sent || 0}</div>
+                    <div class="stat-label">Total Sent (BTC)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${data.final_balance || 0}</div>
+                    <div class="stat-label">Final Balance (BTC)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${data.n_tx || 0}</div>
+                    <div class="stat-label">Total Transactions</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (data.transactions && data.transactions.length > 0) {
+        html += '<div class="transactions-section"><h3>Recent Transactions</h3>';
+        
+        data.transactions.slice(0, 10).forEach((tx, index) => {
+            html += `
+                <div class="transaction-card">
+                    <p><strong>TX ${index + 1}:</strong> <code>${tx.hash || tx.tx_id || 'N/A'}</code></p>
+                    <p><strong>Time:</strong> ${tx.time ? new Date(tx.time * 1000).toLocaleString() : 'N/A'}</p>
+                    <p><strong>Result:</strong> ${tx.result ? (tx.result / 100000000).toFixed(8) + ' BTC' : 'N/A'}</p>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+    }
+    
+    resultsContent.innerHTML = html;
+}
+</script>
+{% endblock %}

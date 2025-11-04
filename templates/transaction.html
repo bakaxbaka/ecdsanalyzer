@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Transaction Analysis - Bitcoin ECDSA Analyzer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Transaction Analysis</h1>
+    <p>Analyze Bitcoin transactions for ECDSA vulnerabilities and weak signatures</p>
+</div>
+
+<div class="analysis-form">
+    <form id="transaction-form">
+        <div class="form-group">
+            <label for="tx_id">Transaction ID (Hash)</label>
+            <input type="text" id="tx_id" name="tx_id" class="form-control" 
+                   placeholder="Enter Bitcoin transaction ID (64 hex characters)" required>
+            <small class="form-text">Example: 9ec4bc49e828d924af1d1029cacf709431abbde46d59554b62bc270e3b29c4b1</small>
+        </div>
+        <button type="submit" class="btn btn-primary">Analyze Transaction</button>
+    </form>
+</div>
+
+<div id="results" class="results-container" style="display: none;">
+    <h2>Analysis Results</h2>
+    <div id="results-content"></div>
+</div>
+
+<script>
+document.getElementById('transaction-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const txId = document.getElementById('tx_id').value.trim();
+    const resultsDiv = document.getElementById('results');
+    const resultsContent = document.getElementById('results-content');
+    
+    resultsDiv.style.display = 'block';
+    resultsContent.innerHTML = '<div class="loading">Analyzing transaction...</div>';
+    
+    try {
+        const response = await fetch('/api/analyze/transaction', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ tx_id: txId })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayResults(data);
+        } else {
+            resultsContent.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
+        }
+    } catch (error) {
+        resultsContent.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+    }
+});
+
+function displayResults(data) {
+    const resultsContent = document.getElementById('results-content');
+    
+    let html = `
+        <div class="result-summary">
+            <h3>Transaction: ${data.tx_id || 'N/A'}</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">${data.total_inputs || 0}</div>
+                    <div class="stat-label">Total Inputs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${data.weak_signatures ? data.weak_signatures.length : 0}</div>
+                    <div class="stat-label">Weak Signatures</div>
+                </div>
+                <div class="stat-card ${data.private_keys_found > 0 ? 'stat-danger' : ''}">
+                    <div class="stat-value">${data.private_keys_found || 0}</div>
+                    <div class="stat-label">Private Keys Found</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (data.weak_signatures && data.weak_signatures.length > 0) {
+        html += '<div class="weak-signatures-section"><h3>Weak Signatures Detected</h3>';
+        
+        data.weak_signatures.forEach((sig, index) => {
+            html += `
+                <div class="signature-card ${sig.type === 'recovered_private_key' ? 'signature-vulnerable' : ''}">
+                    <h4>Signature #${index + 1} - ${sig.type.replace('_', ' ').toUpperCase()}</h4>
+                    <div class="signature-details">
+                        <p><strong>Input Index:</strong> ${sig.input_index}</p>
+                        <p><strong>R Value:</strong> <code>${sig.r}</code></p>
+                        <p><strong>S Value:</strong> <code>${sig.s}</code></p>
+                        <p><strong>Message Hash:</strong> <code>${sig.message || sig.z || 'N/A'}</code></p>
+                        ${sig.type === 'recovered_private_key' ? `
+                            <div class="private-key-info">
+                                <p><strong>🚨 PRIVATE KEY RECOVERED:</strong></p>
+                                <p><strong>Private Key (Hex):</strong> <code>${sig.private_key_hex}</code></p>
+                                <p><strong>WIF Compressed:</strong> <code>${sig.wif_compressed}</code></p>
+                                <p><strong>WIF Uncompressed:</strong> <code>${sig.wif_uncompressed}</code></p>
+                                <p><strong>Primary Address:</strong> ${sig.primary_address}</p>
+                                <p><strong>Balance:</strong> ${sig.total_balance} BTC</p>
+                            </div>
+                        ` : ''}
+                        ${sig.description ? `<p class="signature-description">${sig.description}</p>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+    } else {
+        html += '<div class="info-message">No weak signatures detected in this transaction.</div>';
+    }
+    
+    resultsContent.innerHTML = html;
+}
+</script>
+{% endblock %}
